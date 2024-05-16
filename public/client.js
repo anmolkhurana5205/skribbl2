@@ -38,21 +38,19 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let isDrawing = false;
 let [lastX, lastY] = [0, 0];
-const colorPicker = document.getElementById('color-picker'); // Get the color picker element
+const colorPicker = document.getElementById('color-picker');
 const lineWidthSlider = document.getElementById('line-width-slider');
-let lineWidth = parseInt(lineWidthSlider.value); // Initial line width
+let lineWidth = parseInt(lineWidthSlider.value);
 
 // Add event listener to update stroke style when color is picked
 colorPicker.addEventListener('input', function() {
     ctx.strokeStyle = colorPicker.value;
 });
 
-// Update the line width when the slider value changes
 lineWidthSlider.addEventListener('input', () => {
     lineWidth = parseInt(lineWidthSlider.value);
 });
 
-// Add a new event listener for drawing
 canvas.addEventListener('mousedown', (e) => {
     isDrawing = true;
     [lastX, lastY] = [e.offsetX, e.offsetY];
@@ -81,7 +79,6 @@ function drawLine(x1, y1, x2, y2) {
     ctx.closePath();
 }
 
-// Style boldness slider and color picker
 lineWidthSlider.style.position = 'absolute';
 lineWidthSlider.style.top = '10px';
 lineWidthSlider.style.left = '10px';
@@ -101,8 +98,8 @@ const chatMessages = document.getElementById('chat-messages');
 
 chatInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-        e.preventDefault(); // Prevent the default behavior of the Enter key
-        sendButton.click(); // Simulate a click on the send button
+        e.preventDefault();
+        sendButton.click();
     }
 });
 
@@ -118,7 +115,7 @@ sendButton.addEventListener('click', () => {
 function displayChatMessage(message) {
     const li = document.createElement('li');
     li.textContent = message;
-    li.style.borderBottom = '1px solid #ccc'; // Add a bottom border
+    li.style.borderBottom = '1px solid #ccc';
     chatMessages.appendChild(li);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
