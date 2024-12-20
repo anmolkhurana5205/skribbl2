@@ -1,0 +1,310 @@
+server.js
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const dotenv = require('dotenv');
+
+dotenv.config();
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
+
+// Serve static files from the "public" directory
+app.use(express.static('public'));
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+
+
+
+index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>skribbl2.io</title> <!-- Change the title here -->
+    <link rel="stylesheet" type="text/css" href="styles.css">
+</head>
+<body>
+    <h1><span>Skribbl</span> 2<span></span></h1>
+    <div id="game-container">
+        <div id="drawing-container">
+            <input type="color" id="color-picker"> <!-- Color picker inside the drawing container -->
+            <canvas id="canvas" width="800" height="300"></canvas>
+            <div id="word-container"></div>
+            <input type="range" id="line-width-slider" min="1" max="10" value="2"> <!-- Add this line for line width adjustment -->
+        </div>        
+        <div id="player-list-container">
+            <ul id="player-list"></ul>
+        </div>
+        <div id="chat-container">
+            <ul id="chat-messages"></ul>
+            <input type="text" id="chat-input" placeholder="Tap to guess...">
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+</html>
+
+
+
+client.js
+const socket = io();
+
+// Drawing functionality
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let isDrawing = false;
+let [lastX, lastY] = [0, 0];
+const colorPicker = document.getElementById('color-picker'); // Get the color picker element
+const lineWidthSlider = document.getElementById('line-width-slider');
+let lineWidth = parseInt(lineWidthSlider.value); // Initial line width
+
+// Add event listener to update stroke style when color is picked
+colorPicker.addEventListener('input', function() {
+    ctx.strokeStyle = colorPicker.value;
+});
+
+// Update the line width when the slider value changes
+lineWidthSlider.addEventListener('input', () => {
+    lineWidth = parseInt(lineWidthSlider.value);
+});
+
+// Add a new event listener for drawing
+canvas.addEventListener('mousedown', (e) => {
+    isDrawing = true;
+    [lastX, lastY] = [e.offsetX, e.offsetY];
+});
+
+canvas.addEventListener('mouseup', () => {
+    isDrawing = false;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (isDrawing) {
+        const x = e.offsetX;
+        const y = e.offsetY;
+        drawLine(lastX, lastY, x, y);
+        [lastX, lastY] = [x, y];
+        socket.emit('draw', { x1: lastX, y1: lastY, x2: x, y2: y });
+    }
+});
+
+function drawLine(x1, y1, x2, y2) {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+    ctx.closePath();
+}
+
+// Style boldness slider and color picker
+lineWidthSlider.style.position = 'absolute';
+lineWidthSlider.style.top = '10px';
+lineWidthSlider.style.left = '10px';
+
+colorPicker.style.position = 'absolute';
+colorPicker.style.top = '40px';
+colorPicker.style.left = '10px';
+
+socket.on('draw', (data) => {
+    drawLine(data.x1, data.y1, data.x2, data.y2);
+});
+
+// Chat functionality
+const chatInput = document.getElementById('chat-input');
+const sendButton = document.getElementById('send-button');
+const chatMessages = document.getElementById('chat-messages');
+
+chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault(); // Prevent the default behavior of the Enter key
+        sendButton.click(); // Simulate a click on the send button
+    }
+});
+
+sendButton.addEventListener('click', () => {
+    const message = chatInput.value.trim();
+    if (message !== '') {
+        socket.emit('chatMessage', message);
+        displayChatMessage(message);
+        chatInput.value = '';
+    }
+});
+
+function displayChatMessage(message) {
+    const li = document.createElement('li');
+    li.textContent = message;
+    li.style.borderBottom = '1px solid #ccc'; // Add a bottom border
+    chatMessages.appendChild(li);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+socket.on('chatMessage', (message) => {
+    const li = document.createElement('li');
+    li.textContent = message;
+    chatMessages.appendChild(li);
+});
+
+// Player list functionality
+const playerList = document.getElementById('player-list');
+
+socket.on('updatePlayerList', (players) => {
+    playerList.innerHTML = '';
+    players.forEach((player) => {
+        const li = document.createElement('li');
+        li.textContent = player.name;
+        playerList.appendChild(li);
+    });
+});
+
+// Start a new round
+const startRoundButton = document.getElementById('start-round-button');
+startRoundButton.addEventListener('click', () => {
+    socket.emit('startRound');
+});
+
+
+
+styles.css
+/* Additional styles for background image and centering */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-image: url('background.jpg');
+    background-size: cover; /* Ensure the image covers the entire background */
+    background-repeat: no-repeat; /* Prevent the image from repeating */
+    background-position: center; /* Center the image */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+h1 {
+    position: absolute; /* Position the heading absolutely */
+    top: 20px; /* Adjust the top position as needed */
+    left: 50%; /* Align the heading to the center horizontally */
+    transform: translateX(-50%); /* Center the heading horizontally */
+    color: #af1a1a;
+    font-size: 60px;
+    font-weight: bold;
+    font-family: monospace;
+    letter-spacing: 1px;
+    cursor: pointer;
+    z-index: 1; /* Ensure the title appears over other elements */
+}
+
+h1 span {
+    transition: .5s linear;
+}
+
+h1:hover span:nth-child(1) {
+    margin-right: 3px;
+}
+
+h1:hover span:nth-child(1):after {
+    content: ".io ";
+}
+
+h1:hover span:nth-child(2) {
+    margin-left: 5px;
+}
+
+h1:hover span {
+    color: #dc7070;
+    text-shadow: 0 0 10px #fff,
+                 0 0 20px #fff, 
+                 0 0 40px #fff;
+}
+
+#game-container {
+    display: flex;
+    justify-content: space-between;
+    padding: 0px;
+    width: 1550px;
+    height: 728px;
+}
+
+#drawing-container {
+    flex: 1; /* Make the drawing container smaller */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 800px; /* Set the width of the drawing container */
+    height: 600px; /* Set the height of the drawing container */
+    position: relative; /* Set the drawing container to relative positioning */
+}
+
+#canvas {
+    border: 2px solid #333;
+    background-color: #c1b7b7;
+    cursor: crosshair;
+    margin-bottom: 20px;
+    position: absolute; /* Position the canvas absolutely within the drawing container */
+    top: 150px; /* Align the top of the canvas with the top of the drawing container */
+    left: 370px; /* Align the left of the canvas with the left of the drawing container */
+}
+
+#word-container {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 20px;
+    width: 1200px; /* Double the width of the "Tap to Guess" window */
+    position: absolute;
+    bottom: 10px; /* Shift to the bottom of the webpage */
+    right: 10px;
+}
+
+#player-list-container {
+    flex: 0 0 200px;
+    margin-left: 20px;
+}
+
+#player-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+#chat-container {
+    flex: 0 0 200px;
+    display: flex;
+    flex-direction: column;
+    margin-left: 20px;
+    height: 400px; /* Change the height of the chat container */
+    overflow-y: auto; /* Add scrollbars when content exceeds the height */
+}
+
+#chat-messages {
+    list-style-type: none;
+    padding: 0;
+    flex: 1;
+    overflow-y: scroll;
+    margin-bottom: 20px;
+    height: 300px; /* Change the height of the chat message list */
+    background-color: rgb(254, 254, 254); /* Change background color to light blue */
+    padding: 10px; /* Add padding for better readability */
+}
+
+#chat-input {
+    padding: 5px;
+    margin-right: 10px;
+    flex: 1;
+    height: 40px; /* Change the height of the chat input */
+}
+
+#send-button {
+    padding: 5px 10px;
+    height: 40px; /* Change the height of the send button */
+}
